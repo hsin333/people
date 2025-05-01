@@ -1,20 +1,8 @@
-// Firebase 設定
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
+// 初始化 GUN
+const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
 
-// 初始化 Firebase
-firebase.initializeApp(firebaseConfig);
-
-// 取得資料庫參考
-const database = firebase.database();
-const messagesRef = database.ref('messages');
+// 建立聊天室資料參考
+const chat = gun.get('chat');
 
 // DOM 元素
 const messageInput = document.getElementById('messageInput');
@@ -22,16 +10,24 @@ const nameInput = document.getElementById('nameInput');
 const sendButton = document.getElementById('sendButton');
 const chatMessages = document.getElementById('chatMessages');
 
+// 儲存用戶名稱到 localStorage
+if (localStorage.getItem('username')) {
+    nameInput.value = localStorage.getItem('username');
+}
+nameInput.addEventListener('change', () => {
+    localStorage.setItem('username', nameInput.value);
+});
+
 // 發送訊息
 function sendMessage() {
     const message = messageInput.value.trim();
     const name = nameInput.value.trim() || '匿名';
     
     if (message) {
-        messagesRef.push({
+        chat.set({
             name: name,
             text: message,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
+            timestamp: Date.now()
         });
         messageInput.value = '';
     }
@@ -46,9 +42,15 @@ messageInput.addEventListener('keypress', (e) => {
 });
 
 // 接收訊息
-messagesRef.on('child_added', (snapshot) => {
-    const message = snapshot.val();
+chat.map().on(function(message, id) {
+    if (!message || !message.timestamp) return; // 忽略無效訊息
+    
+    // 檢查訊息是否已經顯示過
+    if (document.getElementById(id)) return;
+    
     const messageElement = document.createElement('div');
+    messageElement.id = id; // 設定唯一ID避免重複顯示
+    
     const currentName = nameInput.value.trim() || '匿名';
     const messageClass = message.name === currentName ? 'sent' : 'received';
     
@@ -62,6 +64,7 @@ messagesRef.on('child_added', (snapshot) => {
         <div class="time">${timeString}</div>
     `;
     
+    // 將新訊息加入到聊天視窗
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 });
